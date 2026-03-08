@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>KLYUCH ELITE PRO</title>
+    <!-- ПІДКЛЮЧЕННЯ QR БІБЛІОТЕКИ -->
+    <script src="https://cdnjs.cloudflare.com"></script>
+    <style>
+        :root { --gold: #f3ba2f; --bg: #050505; --panel: #121318; --green: #26a17b; --red: #d93025; }
+        * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+        body { background: var(--bg); color: white; font-family: 'Inter', sans-serif; margin: 0; display: flex; justify-content: center; align-items: center; min-height: 100vh; }
+        .app { width: 370px; height: 720px; background: var(--panel); border-radius: 45px; padding: 30px; border: 1px solid #222; display: flex; flex-direction: column; position: relative; }
+        .header { text-align: center; margin-bottom: 20px; }
+        .logo { color: var(--gold); font-weight: 900; letter-spacing: 6px; font-size: 22px; }
+        .bal-usd { font-size: 44px; font-weight: 800; text-align: center; margin: 10px 0; }
+        .bal-main { color: #666; font-size: 14px; text-align: center; font-weight: 600; }
+        .action-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin: 30px 0; }
+        .act-item { display: flex; flex-direction: column; align-items: center; cursor: pointer; }
+        .icon-circle { width: 50px; height: 50px; background: #1c1e26; border-radius: 15px; display: flex; justify-content: center; align-items: center; color: var(--gold); border: 1px solid #2a2d37; }
+        .label { font-size: 9px; font-weight: 700; color: #555; text-transform: uppercase; margin-top: 5px; }
+        .assets { background: rgba(0,0,0,0.3); border-radius: 20px; padding: 10px; flex: 1; overflow-y: auto; }
+        .asset-item { display: flex; justify-content: space-between; padding: 12px; border-bottom: 1px solid #1a1a1a; }
+        .trade-section { margin-top: 20px; display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+        .btn-trade { padding: 15px; border-radius: 15px; border: none; font-weight: 800; cursor: pointer; color: white; }
+        input { width: 100%; background: #16181f; border: 1px solid #2a2d37; padding: 18px; border-radius: 15px; color: white; margin-bottom: 15px; text-align: center; font-size: 18px; }
+        #qr-view { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.9); z-index: 100; flex-direction: column; justify-content: center; align-items: center; }
+        #qrcode { background: white; padding: 15px; border-radius: 20px; }
+    </style>
+</head>
+<body>
+    <div class="app">
+        <!-- ЕКРАН ЛОГІНУ -->
+        <div id="auth-view">
+            <div class="logo" style="text-align:center; margin-bottom:40px; margin-top:100px;">KLYUCH</div>
+            <input type="password" id="pin" placeholder="ВВЕДІТЬ ПІН-КОД">
+            <button onclick="login()" style="width:100%; padding:18px; border-radius:15px; border:none; background:var(--gold); font-weight:800; cursor:pointer;">УВІЙТИ</button>
+        </div>
+
+        <!-- ГОЛОВНИЙ ІНТЕРФЕЙС -->
+        <div id="main-ui" style="display:none; height:100%; flex-direction:column;">
+            <div class="header"><div class="logo">KLYUCH</div></div>
+            <div class="bal-section">
+                <h1 class="bal-usd" id="total-usd">$0.00</h1>
+                <div class="bal-main" id="val-bnb">0.00 BNB</div>
+            </div>
+            <div class="action-grid">
+              <div class="act-item" onclick="toggleSend()"><div class="icon-circle">↑</div><div class="label">Send</div></div>
+
+                <div class="act-item" onclick="toggleQR()"><div class="icon-circle">↓</div><div class="label">Receive</div></div>
+                <div class="act-item" onclick="window.open('https://pancakeswap.finance')"><div class="icon-circle">⇆</div><div class="label">Swap</div></div>
+                <div class="act-item" onclick="loadData()"><div class="icon-circle">↻</div><div class="label">Sync</div></div>
+            </div>
+            <div class="assets">
+                <div class="asset-item"><span>Binance Coin</span><span id="list-bnb">0.00</span></div>
+                <div class="asset-item" style="color:var(--gold)"><span>KLYUCH Token</span><span id="list-kly">0</span></div>
+            </div>
+            <div class="trade-section">
+                <button class="btn-trade" style="background:var(--green)" onclick="trade('buy')">КУПИТИ KLY</button>
+                <button class="btn-trade" style="background:var(--red)" onclick="trade('sell')">ПРОДАТИ KLY</button>
+            </div>
+            <div id="addr-chip" style="font-size:10px; color:#444; margin-top:20px; text-align:center; cursor:pointer;" onclick="copyAddr()">0x...</div>
+            <div id="full-addr" style="display:none;"></div>
+        </div>
+    </div>
+
+    <div id="qr-view" onclick="toggleQR()"><div id="qrcode"></div><p id="qr-text" style="color:var(--gold); font-size:10px; margin-top:15px;"></p></div>
+
+    <script>
+        async function login() {
+            const p = document.getElementById('pin').value;
+            const r = await fetch('/login', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({p})});
+            const d = await r.json();
+            if(d.s) { 
+                document.getElementById('auth-view').style.display='none'; 
+                document.getElementById('main-ui').style.display='flex'; 
+                document.getElementById('addr-chip').innerText = d.a.substring(0,8)+'...'+d.a.slice(-4);
+                document.getElementById('full-addr').innerText = d.a;
+                document.getElementById('qr-text').innerText = d.a;
+                loadData(); 
+            } else alert("Невірний ПІН-код");
+        }
+
+        async function loadData() {
+            const r = await fetch('/data', {method:'POST'});
+            const d = await r.json();
+            if(d.s) {
+                document.getElementById('total-usd').innerText = "$" + d.usd;
+                document.getElementById('val-bnb').innerText = d.bnb + " BNB";
+                document.getElementById('list-bnb').innerText = d.bnb;
+                document.getElementById('list-kly').innerText = d.kly;
+            }
+        }
+
+        async function trade(type) {
+            const amt = prompt(type === 'buy' ? "Скільки BNB витратити?" : "Скільки KLY продати?");
+            if(!amt) return;
+            const r = await fetch('/trade', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({type, amt})});
+            const d = await r.json();
+            alert(d.s ? "Успіх! Hash: " + d.h : "Помилка: " + d.m);
+            loadData();
+        }
+
+        function toggleQR() {
+            const v = document.getElementById('qr-view');
+            if(v.style.display === 'flex') { v.style.display = 'none'; }
+            else {
+                document.getElementById('qrcode').innerHTML = "";
+                new QRCode(document.getElementById('qrcode'), { text: document.getElementById('full-addr').innerText, width: 200, height: 200 });
+                v.style.display = 'flex';
+            }
+        }
+
+        function copyAddr() {
+            navigator.clipboard.writeText(document.getElementById('full-addr').innerText);
+            alert("Адресу скопійовано!");
+        }
+    </script>
+   <!-- МОДАЛКА ВІДПРАВКИ -->
+<div id="send-modal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.9); z-index:200; flex-direction:column; justify-content:center; padding:40px;">
+    <h2 style="color:var(--gold); text-align:center;">SEND KLY</h2>
+    <input type="text" id="send-to" placeholder="0x... АДРЕСА ОТРИМУВАЧА">
+    <input type="number" id="send-amt" placeholder="КІЛЬКІСТЬ KLY">
+    <button onclick="confirmSend()" style="width:100%; padding:18px; border-radius:15px; border:none; background:var(--gold); font-weight:800; cursor:pointer;">ПІДТВЕРДИТИ</button>
+    <button onclick="toggleSend()" style="width:100%; background:none; color:#555; border:none; margin-top:20px; cursor:pointer;">СКАСУВАТИ</button>
+</div>
+
+<script>
+// Додай ці функції до існуючого <script>
+function toggleSend() {
+    const m = document.getElementById('send-modal');
+    m.style.display = (m.style.display === 'flex') ? 'none' : 'flex';
+}
+
+async function confirmSend() {
+    const to = document.getElementById('send-to').value;
+    const amt = document.getElementById('send-amt').value;
+    
+    if(!to || !amt) return alert("Заповніть всі поля");
+    
+    const r = await fetch('/send', {
+        method:'POST', 
+        headers:{'Content-Type':'application/json'}, 
+        body:JSON.stringify({to, amt})
+    });
+    const d = await r.json();
+    
+    if(d.s) {
+        alert("Успішно надіслано! Hash: " + d.hash);
+        toggleSend();
+        loadData();
+    } else {
+        alert("Помилка: " + d.m);
+    }
+}
+
+
+function toggleSend() {
+    const modal = document.getElementById('send-modal');
+    modal.style.display = (modal.style.display === 'none' || modal.style.display === '') ? 'flex' : 'none';
+}
+
+async function confirmSend() {
+    const to = document.getElementById('send-to').value;
+    const amount = document.getElementById('send-amt').value;
+
+    if (!to || !amount) {
+        alert("Будь ласка, заповніть всі поля");
+        return;
+    }
+
+    try {
+        const response = await fetch('/send', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ to: to, amount: amount })
+        });
+        const result = await response.json();
+
+        if (result.s) {
+            alert("Транзакція відправлена! Hash: " + result.h);
+            toggleSend();
+            loadData(); // Оновити баланси
+        } else {
+            alert("Помилка: " + result.m);
+        }
+    } catch (e) {
+        alert("Помилка зв'язку з сервером");
+    }
+}
+</script>
+</body>
+</html>
